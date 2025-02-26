@@ -33,13 +33,7 @@ export class UsersService {
     return this.userRepository.find();
   }
 
-  async updateBalance(userId: string, newBalance: number): Promise<User> {
-    const user = await this.findById(userId);
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado.');
-    }
-  
-    user.balance = newBalance;
-    return this.userRepository.save(user);
+  async updateBalance(userId: string, newBalance: number): Promise<void> {
+    await this.userRepository.update(userId, { balance: newBalance });
   }
 }

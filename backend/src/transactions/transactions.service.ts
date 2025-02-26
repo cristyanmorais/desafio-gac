@@ -16,27 +16,39 @@ export class TransactionsService {
     if (senderId === receiverId) {
       throw new BadRequestException('Não é possível transferir para si mesmo.');
     }
-
+  
     const sender = await this.usersService.findById(senderId);
     const receiver = await this.usersService.findById(receiverId);
 
+    console.log("TS - original sender balance: ", typeof(sender.balance));
+    console.log("TS - original receiver balance: ", typeof(receiver.balance));
+  
     if (!sender || !receiver) {
       throw new NotFoundException('Usuário não encontrado.');
     }
-
+  
     if (sender.balance < amount) {
       throw new BadRequestException('Saldo insuficiente.');
     }
+  
+    // Atualizando os saldos
+    sender.balance = Number(sender.balance) - amount;
+    receiver.balance = Number(receiver.balance) + amount;
+    console.log("TS - receiver balance: ", typeof(receiver.balance));
+    console.log("TS - sender balance: ", typeof(sender.balance));
 
-    sender.balance -= amount;
-    receiver.balance += amount;
-
-    const transaction = this.transactionRepository.create({ sender, receiver, amount, status: 'COMPLETED' });
-
-    await this.transactionRepository.save(transaction);
-    await this.usersService.create(sender.name, sender.email, sender.password_hash); // Atualiza saldo no banco
-    await this.usersService.create(receiver.name, receiver.email, receiver.password_hash); // Atualiza saldo no banco
-
-    return transaction;
-  }
+    // Salvando os usuários no banco
+    await this.usersService.updateBalance(sender.id, sender.balance);
+    await this.usersService.updateBalance(receiver.id, receiver.balance);
+  
+    // Criando a transação
+    const transaction = this.transactionRepository.create({
+      sender,
+      receiver,
+      amount,
+      status: 'COMPLETED',
+    });
+  
+    return this.transactionRepository.save(transaction);
+  }  
 }
