@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { ReversalsModule } from './reversals/reversals.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ReversalsModule } from './reversals/reversals.module';
     UsersModule,
     TransactionsModule,
     ReversalsModule,
+    AuthModule,
   ],
 })
 
