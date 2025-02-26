@@ -47,13 +47,9 @@ export class ReversalsService {
         throw new NotFoundException('Usuário solicitante não encontrado.');
       }
       
-      const approver = requester.id === transaction.sender.id ? undefined : transaction.sender;
-      
       const reversal = this.reversalRepository.create({
         transaction,
         requester,
-        approver,
-        status: requester.id === transaction.sender.id ? 'APPROVED' : 'PENDING',
       });      
 
     await this.reversalRepository.save(reversal);
@@ -68,15 +64,15 @@ export class ReversalsService {
   async approveReversal(reversalId: string, approverId: string): Promise<ReversalRequest> {
     const reversal = await this.reversalRepository.findOne({
       where: { id: reversalId },
-      relations: ['transaction', 'approver'],
+      relations: ['transaction', 'approver', 'transaction.receiver', 'transaction.sender'],
     });
 
     if (!reversal) {
       throw new NotFoundException('Pedido de reversão não encontrado.');
     }
 
-    if (!reversal.approver || reversal.approver.id !== approverId) {
-      throw new BadRequestException('Somente o remetente pode aprovar esta reversão.');
+    if (reversal.transaction.receiver.id !== approverId) {
+      throw new BadRequestException('Somente o beneficiário pode aprovar esta reversão.');
     }
 
     reversal.status = 'APPROVED';
@@ -88,9 +84,6 @@ export class ReversalsService {
   }
 
   private async processReversal(transaction: Transaction) {
-    transaction.status = 'REVERSED';
-    await this.transactionRepository.save(transaction);
-
     const sender = await this.usersService.findById(transaction.sender.id);
     const receiver = await this.usersService.findById(transaction.receiver.id);
 
@@ -98,8 +91,11 @@ export class ReversalsService {
         throw new NotFoundException('Usuário não encontrado para reversão.');
     }
 
-    sender.balance += transaction.amount;
-    receiver.balance -= transaction.amount;
+    transaction.status = 'REVERSED';
+    await this.transactionRepository.save(transaction);
+
+    sender.balance = Number(sender.balance) + Number(transaction.amount);
+    receiver.balance = Number(receiver.balance) - Number(transaction.amount);
 
     await this.usersService.updateBalance(sender.id, sender.balance);
     await this.usersService.updateBalance(receiver.id, receiver.balance);

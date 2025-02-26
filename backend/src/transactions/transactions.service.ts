@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { Transaction } from './transaction.entity';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
+
   constructor(
     @InjectRepository(Transaction)
     private readonly transactionRepository: Repository<Transaction>,
@@ -19,36 +21,41 @@ export class TransactionsService {
   
     const sender = await this.usersService.findById(senderId);
     const receiver = await this.usersService.findById(receiverId);
-
-    console.log("TS - original sender balance: ", typeof(sender.balance));
-    console.log("TS - original receiver balance: ", typeof(receiver.balance));
   
-    if (!sender || !receiver) {
-      throw new NotFoundException('Usuário não encontrado.');
+    if (!sender) {
+      throw new NotFoundException('Usuário remetente não encontrado.');
+    }
+    if (!receiver) {
+      throw new NotFoundException('Usuário destinatário não encontrado.');
     }
   
     if (sender.balance < amount) {
       throw new BadRequestException('Saldo insuficiente.');
     }
   
-    // Atualizando os saldos
-    sender.balance = Number(sender.balance) - amount;
-    receiver.balance = Number(receiver.balance) + amount;
-    console.log("TS - receiver balance: ", typeof(receiver.balance));
-    console.log("TS - sender balance: ", typeof(sender.balance));
+    try {
+      const transaction = await this.transactionRepository.manager.transaction(async (manager: EntityManager) => {
+        sender.balance = Number(sender.balance) - amount;
+        receiver.balance = Number(receiver.balance) + amount;
+  
+        await manager.save(sender);
+        await manager.save(receiver);
+  
+        const createdTransaction = manager.create(Transaction, {
+          sender,
+          receiver,
+          amount,
+          status: 'COMPLETED',
+        });
 
-    // Salvando os usuários no banco
-    await this.usersService.updateBalance(sender.id, sender.balance);
-    await this.usersService.updateBalance(receiver.id, receiver.balance);
-  
-    // Criando a transação
-    const transaction = this.transactionRepository.create({
-      sender,
-      receiver,
-      amount,
-      status: 'COMPLETED',
-    });
-  
-    return this.transactionRepository.save(transaction);
+        return await manager.save(createdTransaction);
+      });
+      
+      this.logger.log(`Transferência de ${amount} realizada de ${sender.name} para ${receiver.name}.`);
+      return transaction;
+    } catch (error) {
+      this.logger.error('Erro ao processar transferência', error.stack);
+      throw new InternalServerErrorException('Erro ao processar a transferência.');
+    }
   }  
 }
