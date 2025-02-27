@@ -18,6 +18,10 @@ export class TransactionsService {
     if (senderId === receiverId) {
       throw new BadRequestException('Não é possível transferir para si mesmo.');
     }
+
+    if (amount <= 0) {
+      throw new BadRequestException('Valor da transferência inválido.');
+    }
   
     const sender = await this.usersService.findById(senderId);
     const receiver = await this.usersService.findById(receiverId);

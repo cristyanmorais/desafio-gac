@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcryptjs';
@@ -16,7 +16,7 @@ export class AuthService {
       const { password_hash, ...result } = user;
       return result;
     }
-    return null;
+    throw new UnauthorizedException('Credenciais inválidas.');
   }
 
   async login(user: any) {
