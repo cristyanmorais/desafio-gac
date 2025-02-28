@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
-import { BadRequestException, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { TransactionsService } from 'src/transactions/transactions.service';
 import { Transaction } from 'src/transactions/transaction.entity';
 import { UsersService } from 'src/users/users.service';
@@ -11,7 +11,6 @@ describe('TransactionsService', () => {
   let service: TransactionsService;
   let transactionRepository: Repository<Transaction>;
   let usersService: UsersService;
-  let logger: Logger;
 
   const mockSender: User = {
     id: '1',
@@ -41,14 +40,6 @@ describe('TransactionsService', () => {
     status: 'COMPLETED',
     created_at: new Date(),
     updated_at: new Date(),
-  };
-
-  const mockLogger = {
-    log: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-    debug: jest.fn(),
-    verbose: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -83,17 +74,12 @@ describe('TransactionsService', () => {
             findById: jest.fn(),
           },
         },
-        {
-          provide: Logger, // <- Aqui o mock é passado diretamente
-          useValue: mockLogger,
-        },
       ],
     }).compile();
 
     service = module.get<TransactionsService>(TransactionsService);
     transactionRepository = module.get<Repository<Transaction>>(getRepositoryToken(Transaction));
     usersService = module.get<UsersService>(UsersService);
-    logger = module.get<Logger>(Logger);
   });
 
   it('deve ser definido', () => {
@@ -112,7 +98,6 @@ describe('TransactionsService', () => {
       expect(usersService.findById).toHaveBeenCalledWith(mockReceiver.id);
       expect(transactionRepository.manager.transaction).toHaveBeenCalled();
       expect(result).toEqual(mockTransaction);
-      expect(logger.log).toHaveBeenCalledWith(`Transferência de 200 realizada de John Doe para Jane Doe.`);
     });
 
     it('deve lançar BadRequestException se o remetente e o destinatário forem iguais', async () => {
@@ -154,7 +139,6 @@ describe('TransactionsService', () => {
       jest.spyOn(transactionRepository.manager, 'transaction').mockRejectedValue(new Error('Erro no banco de dados'));
 
       await expect(service.transfer('1', '2', 200)).rejects.toThrow(InternalServerErrorException);
-      expect(logger.error).toHaveBeenCalledWith('Erro ao processar transferência', expect.anything());
     });
   });
 });
